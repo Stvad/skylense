@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         Bluesky URL Mention Sidebar
 // @namespace    http://tampermonkey.net/
-// @version      1.9
-// @description  Display a sidebar with all mentions of the current URL on Bluesky, togglable via Alt+X, with logging, disabled in iframes, drag-resizeable, closeable, updates on navigation without monkey-patching, hidden if no mentions
+// @version      2.0
+// @description  Display a sidebar with all mentions of the current URL on Bluesky, togglable via Alt+X, with logging, disabled in iframes, drag-resizeable, closeable, updates on navigation without monkey-patching, hidden if no mentions.
+//               ALSO if on a Bluesky profile page, show all that user's posts sorted by top.
 // @match        *://*/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
@@ -166,12 +167,46 @@
         fetchMentions(sidebar);
     }
 
+    /**
+     * Extract the handle from a Bluesky profile URL (e.g. "alice.bsky.social" in
+     * "https://bsky.app/profile/alice.bsky.social").
+     */
+    function extractProfileHandle() {
+        if (window.location.host !== 'bsky.app') return null
+
+        // if (!isBlueskyProfilePage()) return null;
+        const match = window.location.href.match(/\/profile\/([^/]+)$/);
+        if (match && match[1]) {
+            // Some Bluesky profiles can have query strings or extra paths,
+            // so let's just decode that part
+            return decodeURIComponent(match[1]);
+        }
+        return null;
+    }
+
+    const getApiUrl = () => {
+        // Decide which endpoint or query to do
+        const handle = extractProfileHandle()
+        if (handle) {
+            // On a user profile page, show all from that user sorted by "top"
+            // Using searchPosts with "sort=top" and query = 'from:handle'
+            console.log('[Bluesky Sidebar]: On profile page, searching posts from user:', handle)
+            return `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent('from:' + handle)}&sort=top`
+        } else {
+            // Original behavior: search for the current URL
+            return `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(window.location.href)}&sort=top`
+        }
+    }
+
+    /**
+     * Fetch posts either by searching for the URL (default) or,
+     * if on a Bluesky profile page, by searching for that handle sorted by top.
+     */
     function fetchMentions(sidebar) {
         if (!sidebar) return;
         console.log('[Bluesky Sidebar]: Fetching mentions for URL:', window.location.href);
         lastUrl = window.location.href;
-        const currentUrl = window.location.href;
-        const apiUrl = `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(currentUrl)}&sort=top`;
+        const apiUrl = getApiUrl()
 
         console.log('[Bluesky Sidebar]: Using API URL', apiUrl);
 
@@ -214,6 +249,7 @@
             // Only display the sidebar if we have posts
             sidebar.style.display = 'block';
 
+            // Rebuild the sidebar content (preserves close button, etc.)
             sidebar.innerHTML = `
                 <div id="bluesky-sidebar-header">
                     <h2>Bluesky Mentions</h2>
@@ -227,6 +263,7 @@
                 sidebar.style.display = 'none';
             });
 
+            // Re-add the resize handle
             const resizeHandle = document.createElement('div');
             resizeHandle.id = 'bluesky-resize-handle';
             sidebar.appendChild(resizeHandle);
@@ -275,6 +312,7 @@
                 sidebar.appendChild(blockquote);
             });
 
+            // Load or refresh the official Bluesky embed script if needed
             const embedScriptSrc = "https://embed.bsky.app/static/embed.js";
             if (!document.querySelector(`script[src="${embedScriptSrc}"]`)) {
                 console.log('[Bluesky Sidebar]: Embed script not found, adding it now');
@@ -315,6 +353,7 @@
         if (sidebar) fetchMentions(sidebar);
     });
 
+    // Poll for URL changes in single-page apps
     setInterval(() => {
         if (window.location.href !== lastUrl) {
             console.log('[Bluesky Sidebar]: URL changed detected by polling');
