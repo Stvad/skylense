@@ -10,22 +10,22 @@
 // @connect      public.api.bsky.app
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(function () {
+    'use strict'
 
     // Check if in iframe; if so, do not run
     if (window.self !== window.top) {
-        console.log('[Bluesky Sidebar]: Running in iframe, script disabled');
-        return;
+        console.log('[Bluesky Sidebar]: Running in iframe, script disabled')
+        return
     }
 
-    console.log('[Bluesky Sidebar]: Script initialized at top-level window');
+    console.log('[Bluesky Sidebar]: Script initialized at top-level window')
 
-    let isResizing = false;
-    let startX = 0;
-    let startWidth = 450; // default width
-    let sidebar = null;
-    let lastUrl = window.location.href;
+    let isResizing = false
+    let startX = 0
+    let startWidth = 450 // default width
+    let sidebar = null
+    let lastUrl = window.location.href
 
     // Add global keydown listener for Alt+X to toggle the sidebar
     document.addEventListener('keydown', (e) => {
@@ -33,43 +33,43 @@
         if (e.altKey && e.code === 'KeyX') {
             if (sidebar) {
                 if (sidebar.style.display === 'none') {
-                    console.log('[Bluesky Sidebar]: Alt+X pressed, opening sidebar');
-                    fetchMentions(sidebar);
+                    console.log('[Bluesky Sidebar]: Alt+X pressed, opening sidebar')
+                    fetchMentions(sidebar)
                 } else {
-                    console.log('[Bluesky Sidebar]: Alt+X pressed, closing sidebar');
-                    sidebar.style.display = 'none';
+                    console.log('[Bluesky Sidebar]: Alt+X pressed, closing sidebar')
+                    sidebar.style.display = 'none'
                 }
             }
         }
-    });
+    })
 
     function createSidebar() {
-        console.log('[Bluesky Sidebar]: Attempting to create sidebar');
+        console.log('[Bluesky Sidebar]: Attempting to create sidebar')
         // Check if the sidebar already exists
         if (document.getElementById('bluesky-sidebar')) {
-            console.log('[Bluesky Sidebar]: Sidebar already exists. Skipping creation.');
-            sidebar = document.getElementById('bluesky-sidebar');
-            return;
+            console.log('[Bluesky Sidebar]: Sidebar already exists. Skipping creation.')
+            sidebar = document.getElementById('bluesky-sidebar')
+            return
         }
 
         // Create sidebar element
-        sidebar = document.createElement('div');
-        sidebar.id = 'bluesky-sidebar';
+        sidebar = document.createElement('div')
+        sidebar.id = 'bluesky-sidebar'
         sidebar.innerHTML = `
             <div id="bluesky-sidebar-header">
                 <h2>Bluesky Mentions</h2>
                 <button id="bluesky-close-btn">X</button>
             </div>
             <p>Loading...</p>
-        `;
-        document.body.appendChild(sidebar);
+        `
+        document.body.appendChild(sidebar)
 
         // Create resize handle
-        const resizeHandle = document.createElement('div');
-        resizeHandle.id = 'bluesky-resize-handle';
-        sidebar.appendChild(resizeHandle);
+        const resizeHandle = document.createElement('div')
+        resizeHandle.id = 'bluesky-resize-handle'
+        sidebar.appendChild(resizeHandle)
 
-        console.log('[Bluesky Sidebar]: Sidebar created and appended to body');
+        console.log('[Bluesky Sidebar]: Sidebar created and appended to body')
 
         GM_addStyle(`
             #bluesky-sidebar {
@@ -128,43 +128,43 @@
                 background: rgba(0,0,0,0);
                 z-index: 10001;
             }
-        `);
+        `)
 
-        console.log('[Bluesky Sidebar]: Styles applied');
+        console.log('[Bluesky Sidebar]: Styles applied')
 
-        const closeBtn = document.getElementById('bluesky-close-btn');
+        const closeBtn = document.getElementById('bluesky-close-btn')
         closeBtn.addEventListener('click', () => {
-            console.log('[Bluesky Sidebar]: Close button clicked');
-            sidebar.style.display = 'none';
-        });
+            console.log('[Bluesky Sidebar]: Close button clicked')
+            sidebar.style.display = 'none'
+        })
 
         const onMouseMove = (e) => {
-            if (!isResizing) return;
-            const deltaX = startX - e.clientX;
-            const newWidth = startWidth + deltaX;
-            sidebar.style.width = Math.max(newWidth, 150) + 'px';
-        };
+            if (!isResizing) return
+            const deltaX = startX - e.clientX
+            const newWidth = startWidth + deltaX
+            sidebar.style.width = Math.max(newWidth, 150) + 'px'
+        }
 
         const onMouseUp = (e) => {
             if (isResizing) {
-                isResizing = false;
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-                startWidth = parseInt(sidebar.style.width, 10);
-                console.log('[Bluesky Sidebar]: Resizing ended, final width:', startWidth + 'px');
+                isResizing = false
+                document.removeEventListener('mousemove', onMouseMove)
+                document.removeEventListener('mouseup', onMouseUp)
+                startWidth = parseInt(sidebar.style.width, 10)
+                console.log('[Bluesky Sidebar]: Resizing ended, final width:', startWidth + 'px')
             }
-        };
+        }
 
         resizeHandle.addEventListener('mousedown', (e) => {
-            isResizing = true;
-            startX = e.clientX;
-            startWidth = parseInt(window.getComputedStyle(sidebar).width, 10);
-            console.log('[Bluesky Sidebar]: Resizing started at X:', startX, 'Current width:', startWidth + 'px');
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
+            isResizing = true
+            startX = e.clientX
+            startWidth = parseInt(window.getComputedStyle(sidebar).width, 10)
+            console.log('[Bluesky Sidebar]: Resizing started at X:', startX, 'Current width:', startWidth + 'px')
+            document.addEventListener('mousemove', onMouseMove)
+            document.addEventListener('mouseup', onMouseUp)
+        })
 
-        fetchMentions(sidebar);
+        fetchMentions(sidebar)
     }
 
     /**
@@ -175,13 +175,13 @@
         if (window.location.host !== 'bsky.app') return null
 
         // if (!isBlueskyProfilePage()) return null;
-        const match = window.location.href.match(/\/profile\/([^/]+)$/);
+        const match = window.location.href.match(/\/profile\/([^/]+)$/)
         if (match && match[1]) {
             // Some Bluesky profiles can have query strings or extra paths,
             // so let's just decode that part
-            return decodeURIComponent(match[1]);
+            return decodeURIComponent(match[1])
         }
-        return null;
+        return null
     }
 
     const getApiUrl = () => {
@@ -203,12 +203,12 @@
      * if on a Bluesky profile page, by searching for that handle sorted by top.
      */
     function fetchMentions(sidebar) {
-        if (!sidebar) return;
-        console.log('[Bluesky Sidebar]: Fetching mentions for URL:', window.location.href);
-        lastUrl = window.location.href;
+        if (!sidebar) return
+        console.log('[Bluesky Sidebar]: Fetching mentions for URL:', window.location.href)
+        lastUrl = window.location.href
         const apiUrl = getApiUrl()
 
-        console.log('[Bluesky Sidebar]: Using API URL', apiUrl);
+        console.log('[Bluesky Sidebar]: Using API URL', apiUrl)
 
         GM_xmlhttpRequest({
             method: 'GET',
@@ -216,38 +216,38 @@
             headers: {
                 'Accept': 'application/json',
             },
-            onload: function(response) {
-                console.log('[Bluesky Sidebar]: API responded with status', response.status);
+            onload: function (response) {
+                console.log('[Bluesky Sidebar]: API responded with status', response.status)
                 if (response.status === 200) {
                     try {
-                        const data = JSON.parse(response.responseText);
-                        console.log('[Bluesky Sidebar]: Parsed JSON data:', data);
-                        displayMentions(data, sidebar);
+                        const data = JSON.parse(response.responseText)
+                        console.log('[Bluesky Sidebar]: Parsed JSON data:', data)
+                        displayMentions(data, sidebar)
                     } catch (e) {
-                        console.error('[Bluesky Sidebar]: Error parsing JSON:', e);
-                        sidebar.innerHTML = '<h2>Bluesky Mentions</h2><p>Error parsing response.</p>';
-                        sidebar.style.display = 'none';
+                        console.error('[Bluesky Sidebar]: Error parsing JSON:', e)
+                        sidebar.innerHTML = '<h2>Bluesky Mentions</h2><p>Error parsing response.</p>'
+                        sidebar.style.display = 'none'
                     }
                 } else {
-                    console.error('[Bluesky Sidebar]: Non-200 status returned:', response.status);
-                    sidebar.innerHTML = '<h2>Bluesky Mentions</h2><p>Error fetching mentions.</p>';
-                    sidebar.style.display = 'none';
+                    console.error('[Bluesky Sidebar]: Non-200 status returned:', response.status)
+                    sidebar.innerHTML = '<h2>Bluesky Mentions</h2><p>Error fetching mentions.</p>'
+                    sidebar.style.display = 'none'
                 }
             },
-            onerror: function() {
-                console.error('[Bluesky Sidebar]: Error during GM_xmlhttpRequest');
-                sidebar.innerHTML = '<h2>Bluesky Mentions</h2><p>Error fetching mentions.</p>';
-                sidebar.style.display = 'none';
-            }
-        });
+            onerror: function () {
+                console.error('[Bluesky Sidebar]: Error during GM_xmlhttpRequest')
+                sidebar.innerHTML = '<h2>Bluesky Mentions</h2><p>Error fetching mentions.</p>'
+                sidebar.style.display = 'none'
+            },
+        })
     }
 
     function displayMentions(data, sidebar) {
-        console.log('[Bluesky Sidebar]: Displaying mentions');
+        console.log('[Bluesky Sidebar]: Displaying mentions')
 
         if (data.posts && data.posts.length > 0) {
             // Only display the sidebar if we have posts
-            sidebar.style.display = 'block';
+            sidebar.style.display = 'block'
 
             // Rebuild the sidebar content (preserves close button, etc.)
             sidebar.innerHTML = `
@@ -255,114 +255,114 @@
                     <h2>Bluesky Mentions</h2>
                     <button id="bluesky-close-btn">X</button>
                 </div>
-            `;
+            `
 
-            const closeBtn = document.getElementById('bluesky-close-btn');
+            const closeBtn = document.getElementById('bluesky-close-btn')
             closeBtn.addEventListener('click', () => {
-                console.log('[Bluesky Sidebar]: Close button clicked');
-                sidebar.style.display = 'none';
-            });
+                console.log('[Bluesky Sidebar]: Close button clicked')
+                sidebar.style.display = 'none'
+            })
 
             // Re-add the resize handle
-            const resizeHandle = document.createElement('div');
-            resizeHandle.id = 'bluesky-resize-handle';
-            sidebar.appendChild(resizeHandle);
+            const resizeHandle = document.createElement('div')
+            resizeHandle.id = 'bluesky-resize-handle'
+            sidebar.appendChild(resizeHandle)
 
-            let localIsResizing = false;
-            let localStartX = 0;
-            let localStartWidth = parseInt(window.getComputedStyle(sidebar).width, 10);
+            let localIsResizing = false
+            let localStartX = 0
+            let localStartWidth = parseInt(window.getComputedStyle(sidebar).width, 10)
 
             const onMouseMove = (e) => {
-                if (!localIsResizing) return;
-                const deltaX = localStartX - e.clientX;
-                const newWidth = localStartWidth + deltaX;
-                sidebar.style.width = Math.max(newWidth, 150) + 'px';
-            };
+                if (!localIsResizing) return
+                const deltaX = localStartX - e.clientX
+                const newWidth = localStartWidth + deltaX
+                sidebar.style.width = Math.max(newWidth, 150) + 'px'
+            }
 
             const onMouseUp = (e) => {
                 if (localIsResizing) {
-                    localIsResizing = false;
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                    localStartWidth = parseInt(sidebar.style.width, 10);
-                    console.log('[Bluesky Sidebar]: Resizing ended, final width:', localStartWidth + 'px');
+                    localIsResizing = false
+                    document.removeEventListener('mousemove', onMouseMove)
+                    document.removeEventListener('mouseup', onMouseUp)
+                    localStartWidth = parseInt(sidebar.style.width, 10)
+                    console.log('[Bluesky Sidebar]: Resizing ended, final width:', localStartWidth + 'px')
                 }
-            };
+            }
 
             resizeHandle.addEventListener('mousedown', (e) => {
-                localIsResizing = true;
-                localStartX = e.clientX;
-                localStartWidth = parseInt(window.getComputedStyle(sidebar).width, 10);
-                console.log('[Bluesky Sidebar]: Resizing started at X:', localStartX, 'Current width:', localStartWidth + 'px');
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
+                localIsResizing = true
+                localStartX = e.clientX
+                localStartWidth = parseInt(window.getComputedStyle(sidebar).width, 10)
+                console.log('[Bluesky Sidebar]: Resizing started at X:', localStartX, 'Current width:', localStartWidth + 'px')
+                document.addEventListener('mousemove', onMouseMove)
+                document.addEventListener('mouseup', onMouseUp)
+            })
 
             data.posts.forEach((post, index) => {
-                console.log('[Bluesky Sidebar]: Processing post', index, post);
-                const blockquote = document.createElement('blockquote');
-                blockquote.className = 'bluesky-embed';
-                blockquote.setAttribute('data-bluesky-uri', post.uri);
-                blockquote.setAttribute('data-bluesky-cid', post.cid);
+                console.log('[Bluesky Sidebar]: Processing post', index, post)
+                const blockquote = document.createElement('blockquote')
+                blockquote.className = 'bluesky-embed'
+                blockquote.setAttribute('data-bluesky-uri', post.uri)
+                blockquote.setAttribute('data-bluesky-cid', post.cid)
 
-                const p = document.createElement('p');
-                p.textContent = post.record.text || '[No Text]';
-                blockquote.appendChild(p);
+                const p = document.createElement('p')
+                p.textContent = post.record.text || '[No Text]'
+                blockquote.appendChild(p)
 
-                sidebar.appendChild(blockquote);
-            });
+                sidebar.appendChild(blockquote)
+            })
 
             // Load or refresh the official Bluesky embed script if needed
-            const embedScriptSrc = "https://embed.bsky.app/static/embed.js";
+            const embedScriptSrc = "https://embed.bsky.app/static/embed.js"
             if (!document.querySelector(`script[src="${embedScriptSrc}"]`)) {
-                console.log('[Bluesky Sidebar]: Embed script not found, adding it now');
-                const script = document.createElement('script');
-                script.async = true;
-                script.src = embedScriptSrc;
-                script.charset = "utf-8";
-                document.body.appendChild(script);
+                console.log('[Bluesky Sidebar]: Embed script not found, adding it now')
+                const script = document.createElement('script')
+                script.async = true
+                script.src = embedScriptSrc
+                script.charset = "utf-8"
+                document.body.appendChild(script)
 
                 script.addEventListener('load', () => {
-                    console.log('[Bluesky Sidebar]: Embed script loaded');
-                });
+                    console.log('[Bluesky Sidebar]: Embed script loaded')
+                })
                 script.addEventListener('error', (e) => {
-                    console.error('[Bluesky Sidebar]: Error loading embed script', e);
-                });
+                    console.error('[Bluesky Sidebar]: Error loading embed script', e)
+                })
             } else {
-                console.log('[Bluesky Sidebar]: Embed script already present on page');
-                window?.bluesky?.scan();
+                console.log('[Bluesky Sidebar]: Embed script already present on page')
+                window?.bluesky?.scan()
             }
         } else {
-            console.log('[Bluesky Sidebar]: No posts found, hiding sidebar');
-            sidebar.style.display = 'none';
+            console.log('[Bluesky Sidebar]: No posts found, hiding sidebar')
+            sidebar.style.display = 'none'
         }
     }
 
     window.addEventListener('load', () => {
-        console.log('[Bluesky Sidebar]: window load event fired');
-        createSidebar();
-    });
+        console.log('[Bluesky Sidebar]: window load event fired')
+        createSidebar()
+    })
 
     window.addEventListener('popstate', () => {
-        console.log('[Bluesky Sidebar]: popstate event detected');
-        if (sidebar) fetchMentions(sidebar);
-    });
+        console.log('[Bluesky Sidebar]: popstate event detected')
+        if (sidebar) fetchMentions(sidebar)
+    })
 
     window.addEventListener('hashchange', () => {
-        console.log('[Bluesky Sidebar]: hashchange event detected');
-        if (sidebar) fetchMentions(sidebar);
-    });
+        console.log('[Bluesky Sidebar]: hashchange event detected')
+        if (sidebar) fetchMentions(sidebar)
+    })
 
     // Poll for URL changes in single-page apps
     setInterval(() => {
         if (window.location.href !== lastUrl) {
-            console.log('[Bluesky Sidebar]: URL changed detected by polling');
+            console.log('[Bluesky Sidebar]: URL changed detected by polling')
             if (sidebar && sidebar.style.display !== 'none') {
-                fetchMentions(sidebar);
+                fetchMentions(sidebar)
             } else {
-                lastUrl = window.location.href;
+                lastUrl = window.location.href
             }
         }
-    }, 1000);
+    }, 1000)
 
-})();
+})()
