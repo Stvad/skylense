@@ -1,13 +1,16 @@
 // ==UserScript==
 // @name         Bluesky URL Mention Sidebar
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  Display a sidebar with all mentions of the current URL on Bluesky, togglable via Alt+X, with logging, disabled in iframes, drag-resizeable, closeable, updates on navigation without monkey-patching, hidden if no mentions.
 //               ALSO if on a Bluesky profile page, show all that user's posts sorted by top.
 // @match        *://*/*
+// @exclude-match      *://localhost:*/*
+// @exclude-match      *://127.0.0.1:*/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
 // @connect      public.api.bsky.app
+// @license MIT
 // ==/UserScript==
 
 (function () {
@@ -320,7 +323,7 @@
                 script.async = true
                 script.src = embedScriptSrc
                 script.charset = "utf-8"
-                document.body.appendChild(script)
+                document.head.appendChild(script)
 
                 script.addEventListener('load', () => {
                     console.log('[Bluesky Sidebar]: Embed script loaded')
@@ -330,11 +333,56 @@
                 })
             } else {
                 console.log('[Bluesky Sidebar]: Embed script already present on page')
-                window?.bluesky?.scan()
+                // window?.bluesky?.scan()
+                scan(sidebar)
             }
         } else {
             console.log('[Bluesky Sidebar]: No posts found, hiding sidebar')
             sidebar.style.display = 'none'
+        }
+    }
+
+    /**
+     * Scan the document for all elements with the data-bluesky-aturi attribute,
+     * and initialize them as Bluesky embeds.
+     *
+     * @param element Only scan this specific element @default document @optional
+     * @returns
+     */
+    function scan(node) {
+        if (node === void 0) { node = document; }
+        var embeds = node.querySelectorAll('[data-bluesky-uri]');
+        for (var i = 0; i < embeds.length; i++) {
+            var id = String(Math.random()).slice(2);
+            var embed = embeds[i];
+            var aturi = embed.getAttribute('data-bluesky-uri');
+            if (!aturi) {
+                continue;
+            }
+            var ref_url = location.origin + location.pathname;
+            var searchParams = new URLSearchParams();
+            searchParams.set('id', id);
+            if (ref_url.startsWith('http')) {
+                searchParams.set('ref_url', encodeURIComponent(ref_url));
+            }
+            var iframe = document.createElement('iframe');
+            iframe.setAttribute('data-bluesky-id', id);
+            iframe.src = "".concat(EMBED_URL, "/embed/").concat(aturi.slice('at://'.length), "?").concat(searchParams.toString());
+            iframe.width = '100%';
+            iframe.style.border = 'none';
+            iframe.style.display = 'block';
+            iframe.style.flexGrow = '1';
+            iframe.frameBorder = '0';
+            iframe.scrolling = 'no';
+            var container = document.createElement('div');
+            container.style.maxWidth = '600px';
+            container.style.width = '100%';
+            container.style.marginTop = '10px';
+            container.style.marginBottom = '10px';
+            container.style.display = 'flex';
+            container.className = 'bluesky-embed';
+            container.appendChild(iframe);
+            embed.replaceWith(container);
         }
     }
 
