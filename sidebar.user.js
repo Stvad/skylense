@@ -9,7 +9,6 @@
 // @exclude-match      *://127.0.0.1:*/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getResourceText
-// @grant        GM_addStyle
 // @connect      public.api.bsky.app
 // @resource     customCSS https://unpkg.com/bsky-react-post@0.1.7/index.esm.css
 // @run-at       document-idle
@@ -35,66 +34,74 @@
     const html = htm.default.bind(React.default.createElement)
     const {EmbeddedPost: BskyPost} = bskyReactPost
 
-    const css = GM_getResourceText("customCSS")
-    GM_addStyle(css)
-    // Rest of your styles remain the same
-    GM_addStyle(`
-        #bluesky-sidebar {
-            position: fixed;
-            top: 50px;
-            right: 0;
-            width: 450px;
-            height: calc(100vh - 50px);
-            background: #ffffff;
-            border-left: 1px solid #e0e0e0;
-            padding: 16px;
-            overflow-y: auto;
-            z-index: 10000;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            box-sizing: border-box;
-            display: none;
-            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-            color: black; 
-        }
-        .bluesky-sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        .bluesky-resize-handle {
-            position: absolute;
-            left: -3px;
-            top: 0;
-            width: 6px;
-            height: 100%;
-            cursor: ew-resize;
-            background: transparent;
-            z-index: 10001;
-        }
-        .bluesky-close-btn {
-            background: transparent;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 4px 8px;
-            color: #536471;
-        }
-        .bluesky-close-btn:hover {
-            background: #f7f7f7;
-            border-radius: 4px;
-        }
-        .bsky-react-post-theme {
-            margin-top: 1em;
-        }
-        .bsky-react-post-theme a {
-            text-decoration: none;
-        }
-    `)
+    // Grab the CSS from @resource and define our local styles
+    const externalCSS = GM_getResourceText('customCSS') || ''
+    const localCSS = `
+#bluesky-sidebar {
+    position: fixed;
+    top: 50px;
+    right: 0;
+    width: 450px;
+    height: calc(100vh - 50px);
+    background: #ffffff;
+    border-left: 1px solid #e0e0e0;
+    padding: 16px;
+    overflow-y: auto;
+    z-index: 10000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    box-sizing: border-box;
+    display: none;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+    color: black; 
+}
+.bluesky-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0;
+}
+.bluesky-sidebar-header > h2 {
+    margin-top: 0px;
+    margin-bottom: 10px;
+}
+.bluesky-resize-handle {
+    position: absolute;
+    left: -3px;
+    top: 0;
+    width: 6px;
+    height: 100%;
+    cursor: ew-resize;
+    background: transparent;
+    z-index: 10001;
+}
+.bluesky-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    color: #536471;
+}
+.bluesky-close-btn:hover {
+    background: #f7f7f7;
+    border-radius: 4px;
+}
+.bsky-react-post-theme {
+    margin-top: 1em;
+}
+.bsky-react-post-theme a {
+    text-decoration: none;
+}
+img, video {
+    max-width: 100%;
+    height: auto;
+}
+`
 
-    // Component definitions remain the same
+    // Combine both external and local style blocks
+    const combinedCSS = externalCSS + localCSS
+
+    // Components
     const Post = ({post}) => {
         return html`
             <${BskyPost} thread=${{post, parent: null, replies: []}}/>`
@@ -150,14 +157,13 @@
 
     const getPosts = (data) => {
         if (!data?.posts) return []
-        return data.posts.map(post =>
-            ({
-                ...post,
-                author: {
-                    ...post.author,
-                    labels: post.author.labels?.filter(l => l.val !== "!no-unauthenticated"),
-                },
-            }))
+        return data.posts.map(post => ({
+            ...post,
+            author: {
+                ...post.author,
+                labels: post.author.labels?.filter(l => l.val !== "!no-unauthenticated"),
+            },
+        }))
     }
 
     const App = () => {
@@ -243,9 +249,24 @@
         return match?.[1] ? decodeURIComponent(match[1]) : null
     }
 
-    const root = document.createElement('div')
-    root.id = 'bluesky-root'
-    document.body.appendChild(root)
-    const reactRoot = ReactDOM.default.createRoot(root)
+    // --- Create a Shadow DOM and render the app there ---
+    const hostEl = document.createElement('div')
+    hostEl.id = 'bluesky-host'
+    document.body.appendChild(hostEl)
+
+    const shadowRoot = hostEl.attachShadow({mode: 'open'})
+
+    // Inject combined CSS inside shadow root instead of the main document
+    const styleEl = document.createElement('style')
+    styleEl.textContent = combinedCSS
+    shadowRoot.appendChild(styleEl)
+
+    // Create container for React
+    const containerEl = document.createElement('div')
+    containerEl.id = 'bluesky-root'
+    shadowRoot.appendChild(containerEl)
+
+    // Render the React app into the shadow root
+    const reactRoot = ReactDOM.default.createRoot(containerEl)
     reactRoot.render(React.default.createElement(App))
 })()
