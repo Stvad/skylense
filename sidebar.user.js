@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bluesky URL Mention Sidebar
 // @namespace    http://tampermonkey.net/
-// @version      3.1
+// @version      3.2
 // @description  Display a sidebar with all mentions of the current URL on Bluesky, togglable via Alt+X, with logging, disabled in iframes, drag-resizeable, closeable, updates on navigation without monkey-patching, hidden if no mentions.
 //               ALSO if on a Bluesky profile page, show all that user's posts sorted by top.
 // @match        *://*/*
@@ -45,24 +45,15 @@
     height: calc(100vh - 50px);
     background: #ffffff;
     border-left: 1px solid #e0e0e0;
-    padding: 16px;
-    overflow-y: auto;
-    z-index: 10000;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     box-sizing: border-box;
     display: none;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-    color: black; 
-}
-.bluesky-sidebar-header {
+    color: black;
+    z-index: 10000;
+
+    /* Make the entire sidebar a flex container so header stays at top */
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #e0e0e0;
-}
-.bluesky-sidebar-header > h2 {
-    margin-top: 0px;
-    margin-bottom: 10px;
+    flex-direction: column;
 }
 .bluesky-resize-handle {
     position: absolute;
@@ -74,12 +65,28 @@
     background: transparent;
     z-index: 10001;
 }
+.bluesky-sidebar-header {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 16px;
+}
+.bluesky-sidebar-header > h2 {
+    margin: 0;
+}
+.bluesky-sidebar-content {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+}
 .bluesky-close-btn {
     background: transparent;
     border: none;
     font-size: 20px;
     cursor: pointer;
-    padding: 4px 8px;
     color: #536471;
 }
 .bluesky-close-btn:hover {
@@ -87,7 +94,7 @@
     border-radius: 4px;
 }
 .bsky-react-post-theme {
-    margin-top: 1em;
+    margin-bottom: 1em;
 }
 .bsky-react-post-theme a {
     text-decoration: none;
@@ -104,53 +111,28 @@ img, video {
     // Components
     const Post = ({post}) => {
         return html`
-            <${BskyPost} thread=${{post, parent: null, replies: []}}/>`
+            <${BskyPost} thread=${{post, parent: null, replies: []}}/>
+        `
     }
 
-    const Sidebar = ({posts, onClose, isLoading}) => {
-        const [width, setWidth] = React.default.useState(450)
-        const sidebarRef = React.default.useRef(null)
-
-        React.default.useEffect(() => {
-            if (sidebarRef.current) {
-                sidebarRef.current.style.display = 'block'
-                sidebarRef.current.style.width = `${width}px`
-            }
-        }, [width])
-
-        const handleResizeStart = (e) => {
-            const startX = e.clientX
-            const startWidth = width
-
-            const handleMouseMove = (e) => {
-                const deltaX = startX - e.clientX
-                const newWidth = Math.max(startWidth + deltaX, 150)
-                setWidth(newWidth)
-            }
-
-            const handleMouseUp = () => {
-                document.removeEventListener('mousemove', handleMouseMove)
-                document.removeEventListener('mouseup', handleMouseUp)
-            }
-
-            document.addEventListener('mousemove', handleMouseMove)
-            document.addEventListener('mouseup', handleMouseUp)
-        }
-
+    const Sidebar = ({posts, onClose, isLoading, width, handleResizeStart, sidebarRef}) => {
         return html`
-            <div id="bluesky-sidebar" ref=${sidebarRef}>
-                <div className="bluesky-resize-handle"
-                     onMouseDown=${handleResizeStart}
-                />
+            <div id="bluesky-sidebar" ref=${sidebarRef} style=${{width: `${width}px`}}>
+                <div className="bluesky-resize-handle" onMouseDown=${handleResizeStart}></div>
                 <div className="bluesky-sidebar-header">
                     <h2>Bluesky Mentions</h2>
                     <button className="bluesky-close-btn" onClick=${onClose}>×</button>
                 </div>
-                ${isLoading ? html`<p>Loading...</p>` :
-                        posts.length ? posts.map(post => html`
-                                    <${Post} key=${post.uri} post=${post}/>`)
-                                : html`<p>No mentions found.</p>`
-                }
+                <div className="bluesky-sidebar-content">
+                    ${
+                            isLoading
+                                    ? html`<p>Loading...</p>`
+                                    : posts.length
+                                            ? posts.map(post => html`
+                                                <${Post} key=${post.uri} post=${post}/>`)
+                                            : html`<p>No mentions found.</p>`
+                    }
+                </div>
             </div>
         `
     }
@@ -170,6 +152,8 @@ img, video {
         const [posts, setPosts] = React.default.useState([])
         const [isLoading, setIsLoading] = React.default.useState(false)
         const [isVisible, setIsVisible] = React.default.useState(false)
+        const [width, setWidth] = React.default.useState(450)
+        const sidebarRef = React.default.useRef(null)
         const lastUrl = React.default.useRef(window.location.href)
 
         const fetchMentions = React.default.useCallback(async () => {
@@ -192,6 +176,8 @@ img, video {
                 const data = JSON.parse(response.responseText)
                 const newPosts = getPosts(data)
                 setPosts(newPosts)
+
+                // Only show sidebar if we got some results
                 if (newPosts.length > 0) {
                     setIsVisible(true)
                 }
@@ -209,6 +195,7 @@ img, video {
 
         React.default.useEffect(() => {
             const handleKeyDown = (e) => {
+                // Alt+X toggles the sidebar
                 if (e.altKey && e.code === 'KeyX') {
                     setIsVisible(v => !v)
                 }
@@ -223,6 +210,8 @@ img, video {
 
             document.addEventListener('keydown', handleKeyDown)
             window.addEventListener('popstate', checkUrlChange)
+
+            // Fallback interval to detect SPA navigations
             const interval = setInterval(checkUrlChange, 1000)
 
             return () => {
@@ -232,6 +221,27 @@ img, video {
             }
         }, [fetchMentions, posts.length])
 
+        // Handle drag-resizing
+        const handleResizeStart = React.default.useCallback((e) => {
+            const startX = e.clientX
+            const startWidth = width
+
+            const handleMouseMove = (e) => {
+                const deltaX = startX - e.clientX
+                const newWidth = Math.max(startWidth + deltaX, 150)
+                setWidth(newWidth)
+            }
+
+            const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove)
+                document.removeEventListener('mouseup', handleMouseUp)
+            }
+
+            document.addEventListener('mousemove', handleMouseMove)
+            document.addEventListener('mouseup', handleMouseUp)
+        }, [width])
+
+        // Render nothing if sidebar isn't visible
         if (!isVisible) return null
 
         return html`
@@ -239,11 +249,15 @@ img, video {
                     posts=${posts}
                     isLoading=${isLoading}
                     onClose=${() => setIsVisible(false)}
+                    width=${width}
+                    handleResizeStart=${handleResizeStart}
+                    sidebarRef=${sidebarRef}
             />
         `
     }
 
     function extractProfileHandle() {
+        // If we are on a Bluesky profile page, we'll show that user's top posts
         if (window.location.host !== 'bsky.app') return null
         const match = window.location.href.match(/\/profile\/([^/]+)$/)
         return match?.[1] ? decodeURIComponent(match[1]) : null
