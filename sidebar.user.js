@@ -158,9 +158,10 @@ img, video {
 
         const fetchMentions = React.default.useCallback(async () => {
             setIsLoading(true)
-            const handle = extractProfileHandle()
+            const handle = await extractProfileHandle()
             const query = handle ? `from:${handle}` : window.location.href
             const apiUrl = `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(query)}&sort=top`
+            console.log('[Bluesky Sidebar]: Fetching mentions:', apiUrl)
 
             try {
                 const response = await new Promise((resolve, reject) => {
@@ -256,11 +257,50 @@ img, video {
         `
     }
 
-    function extractProfileHandle() {
+    async function extractProfileHandle() {
         // If we are on a Bluesky profile page, we'll show that user's top posts
         if (window.location.host !== 'bsky.app') return null
-        const match = window.location.href.match(/\/profile\/([^/]+)$/)
-        return match?.[1] ? decodeURIComponent(match[1]) : null
+        const match = window.location.pathname.match(/\/profile\/([^/]+)$/)
+        const rawHandle = match?.[1] ? decodeURIComponent(match[1]) : null
+        return isDidPlc(rawHandle) ? fetchHandleFromDidPlc(rawHandle) : rawHandle
+    }
+
+    const isDidPlc = handle => /^did:plc:[a-zA-Z0-9]{24}$/.test(handle)
+
+    function fetchHandleFromDidPlc(didPlc) {
+        const url = `https://plc.directory/${didPlc}`;
+
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                headers: {
+                    'Accept': 'application/json',
+                },
+                onload: function(response) {
+                    if (response.status === 200) {
+                        try {
+                            const data = JSON.parse(response.responseText);
+                            const alsoKnownAs = data.alsoKnownAs;
+                            if (Array.isArray(alsoKnownAs) && alsoKnownAs.length > 0) {
+                                // Extract the handle from the at:// URI
+                                const handle = alsoKnownAs[0].replace('at://', '');
+                                resolve(handle);
+                            } else {
+                                reject(new Error('No associated handle found.'));
+                            }
+                        } catch (error) {
+                            reject(new Error('Error parsing response JSON.'));
+                        }
+                    } else {
+                        reject(new Error(`Request failed with status: ${response.status}`));
+                    }
+                },
+                onerror: function() {
+                    reject(new Error('Network error occurred.'));
+                }
+            });
+        });
     }
 
     // --- Create a Shadow DOM and render the app there ---
